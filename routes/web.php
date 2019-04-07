@@ -14,3 +14,17 @@
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/urlrequest','UrlRequestController@makeRequest');
+
+Route::get('/postorder','UrlRequestController@traverseTreePostorder');
+
+Route::get('/addLinks', function(){
+    return view('addLinks');
+});
+
+Route::get('showLinks','UrlRequestController@showLinks');
+
+Route::post('saveLink','UrlRequestController@saveLink');
+
+Route::get('deleteLink/{id}','UrlRequestController@deleteLink');
