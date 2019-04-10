@@ -33,8 +33,5 @@ Route::get('/changedLinks','UrlRequestController@changedLinks')->middleware('aut
 
 Route::get('/showDiff/{id}','UrlRequestController@showDiff')->middleware('auth');
 
-Route::get('/abc', function(){
-    return view('file34_diff');
-});
 
 Auth::routes();
