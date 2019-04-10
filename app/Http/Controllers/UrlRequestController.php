@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Http\Controllers;
-// require('simple_html_dom.php');
 
 use App\Link;
 use GuzzleHttp\Psr7;
