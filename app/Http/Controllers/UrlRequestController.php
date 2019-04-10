@@ -1,18 +1,24 @@
 <?php
 
 namespace App\Http\Controllers;
-require('simple_html_dom.php');
+// require('simple_html_dom.php');
+
 use App\Link;
 use GuzzleHttp\Psr7;
 use GuzzleHttp\Client;
+use App\Mail\LinksChanged;
+use Caxy\HtmlDiff\HtmlDiff;
 use Illuminate\Http\Request;
 use GuzzleHttp\Stream\Stream;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 class UrlRequestController extends Controller
 {
-    public $stack_old,$top_old,$stack_new,$top_new,$allContent;
-    public $x;
+    public $linkChangedId;
 
     public function saveLink(Request $requestM){
         $client = new Client([
@@ -21,11 +27,10 @@ class UrlRequestController extends Controller
         $response = $client->request('GET');
         if($response->getStatusCode() == 200){
             if(Link::select('*')->where(['url'=>$requestM->input('link')])->count() == 0){
-                $row = Link::create(['url' => $requestM->input('link')]);
-                if($row->id){
+                if(Auth::user()){
                     $sourceCode = $response->getBody()->read(99999999);
                     $sourceCode = preg_replace('/\s+/', ' ', $sourceCode);
-                    Storage::disk('local')->put('file'.$row->id.'.html', $sourceCode);
+                    $row = Link::create(['user_id'=>Auth::user()->id, 'url' => $requestM->input('link'), 'link_content' => $sourceCode]);
                     return view('addLinks',['success' => 1]);
                 }
                 else{
@@ -35,7 +40,6 @@ class UrlRequestController extends Controller
             else{
                 return view('addLinks',['success' => 3]);
             }
-            
         }
         else{
             return view('addLinks',['success' => 2]);
@@ -43,136 +47,108 @@ class UrlRequestController extends Controller
     }
 
     public function showLinks(){
-        $temp = Link::all();
+        $temp = Auth::user()->links()->get();
         return response()->json($temp);
     }
 
     public function deleteLink($id){
-        if(Link::find($id)->delete()){
-            $res = Storage::disk('local')->delete(['file'.$id.'.html','file'.$id.'_new.html']);
-            return response()->json('true');
-        }
-        else{
-            return reseponse()->json('false');
-        }
-    }
-
-    public function makeRequest(){
-        $client = new Client([
-            // 'base_uri' => 'https://www.webnots.com/what-is-http/'
-            'base_uri' => 'https://www.blizzard.com/en-us/'
-        ]);
-        $response = $client->request('GET');
-        $tempResp = $response->getBody()->read(99999999);
-        $tempResp = preg_replace('/\s+/', ' ', $tempResp);
-        Storage::disk('local')->put('file1_new.html', $tempResp);
-        // $handle_old = @fopen(__DIR__.'/../../../storage/app/file1.html', 'r');
-        // $handle_new = @fopen(__DIR__.'/../../../storage/app/file1_new.html', 'r');
-        // if($handle_old && $handle_new){
-        //     while(($buffer_old = fgets($handle_old)) !== false && ($buffer_new = fgets($handle_new)) !== false){
-        //         if(!strcasecmp($buffer_new,$buffer_old)){
-        //             dd('not similar');
-        //         }
-        //     }
-        // }
-        // else{
-        //     dd("error in opening files");
-        // }
-        //     while(($buffer = fgets($handle)) !== false){
-        //         $x.= $buffer;
-        //         $count++;
-        //     }
-        //     fclose($handle);
-        // }
-        // dd($count);
-        // dd(gettype($response->getBody()->read(9999999)));
-        // $stream = Psr7\stream_for($response->getBody()->read(99999999));
-        // dd($stream->read(33));
-        // dd($response->getBody()->read(99999999));
-        // dd($response);
-        // dd('a');
-        // $html = file_get_html('https://www.blizzard.com/en-us/');
-        $html_old = file_get_html(__DIR__.'/../../../storage/app/file1.html');
-        $html_new = file_get_html(__DIR__.'/../../../storage/app/file1_new.html');
-        // dd($html->find('html')[0]->children[0]->children[0]->__toString());
-        // dd($html->find('html')[0]->children);
-        $root_old = $html_old->root->children[1];
-        $root_new = $html_new->root->children[1];
-        $this->stack_old = array();
-        $this->stack_new = array();
-        $this->top_old = -1;
-        $this->top_new = -1;
-        $this->allContent = "";
-        $this->stack_old = $root_old->children;
-        $this->stack_new = $root_new->children;
-        $this->top_old += count($this->stack_old);
-        $this->top_new += count($this->stack_new);
-        $this->traverseTree();
-        // dd($stack_old);
-        Storage::disk('local')->put('file1_compx.html', $this->allContent);
-    }
-
-    public function traverseTree(){
-        if($this->top_old > -1 && $this->top_new > -1){
-            $temp_old = $this->stack_old[$this->top_old--];
-            $temp_new = $this->stack_new[$this->top_new--];
-            if(strcmp($temp_old->__toString(), $temp_new->__toString())){
-                $this->allContent .= "\n"."OLD:\n\n".$temp_old->__toString()."\nNew:\n\n".$temp_new->__toString();
+        if(Auth::user()->id){
+            if(Link::find($id)->delete()){
+                return response()->json('true');
             }
-            $tempArr_old = $temp_old->children;
-            $tempArr_new = $temp_new->children;
-            if(!empty($tempArr_old) && !empty($tempArr_new)){
-                foreach($tempArr_old as $x){
-                    $this->stack_old[++$this->top_old] = $x;
-                }
-                foreach($tempArr_new as $x){
-                    $this->stack_new[++$this->top_new] = $x;
-                }
-            }
-            $this->traverseTree();
-        }
-        else{
-            return;
-        }
-    }
-
-    public function traverseTreePostorder(){
-        // $html = file_get_html(__DIR__.'/../../../storage/app/postorder.html');
-        $html = file_get_html(__DIR__.'/../../../storage/app/file1.html');
-        $root = $html->root->children[1];
-        $qObj = array();
-        $qChildAdded = array();
-        $front = 0;
-        $rear = -1;
-        $allContent = "";
-        // dd($root->children);
-        $tempRev = array_reverse($root->children);
-        foreach($tempRev as $x){
-            ++$rear;
-            $qObj[$rear] = $x; 
-            $qChildAdded[$rear] = -1;
-        }
-        // dd(($qObj[$rear]->tag));
-        while($rear > -1){
-            if(!empty($qObj[$rear]->children) && $qChildAdded[$rear] == -1){
-                $qChildAdded[$rear] = 1;
-                $temp = $qObj[$rear]->children;
-                $temp = array_reverse($temp);
-                foreach($temp as $z){
-                    ++$rear;
-                    $qObj[$rear] = $z;
-                    $qChildAdded[$rear] = -1;
-                }
-            }
-            // case where its children have already been printed or it has no children
             else{
-                if($qObj[$rear]->tag != "head" && $qObj[$rear]->tag != "body"){
-                    $allContent .= $qObj[$rear]->__toString()."\n";
-                }    
-                $rear--;
+                return reseponse()->json('false');
+            }
+        }    
+    }  
+
+    public function findDiff(){
+        $this->linkChangedId = array();
+        $linksArr = Link::all();
+        foreach($linksArr as $link){
+            $client = new Client([
+                'base_uri' => $link->url
+            ]);
+            $response = $client->request('GET');
+            if($response->getStatusCode() == 200){
+                $sourceCode = $response->getBody()->read(99999999);
+                $sourceCode = preg_replace('/\s+/', ' ', $sourceCode);
+                if(Storage::disk('local')->put('file'.$link->id.'_new.html', $sourceCode)){
+                    Log::debug('callin diff for url:'.$link->url);
+                    $retVal = $this->generateDiff($link->id, $sourceCode);
+                    if($retVal == 0){
+                        continue;
+                    }
+                }
+                else{
+                    //handle not able to create new file 
+                    continue;
+                }
+            }
+            else{
+                //handle link not accessible errors
+                continue;
             }
         }
-        dd($allContent);
+        $changedUrls = array();
+        Log::info(print_r($this->linkChangedId, true));
+        if(!empty($this->linkChangedId)){
+            foreach($this->linkChangedId as $id){
+                $changedUrls[] = $linksArr->find($id)->url;
+            }
+            Mail::to('rvkmr0851@gmail.com')->send(new LinksChanged($changedUrls));
+        }
+    }
+
+    public function generateDiff($id, &$sourceCode){
+        $x = Link::find($id)->link_content;;
+        if(!empty($x) && !empty($sourceCode)){
+            $htmlDiff = new HtmlDiff($x, $sourceCode);
+            $hasDiffCheckStr1 = 'class="diffmod"';
+            $hasDiffCheckStr2 = '<ins>';
+            $hasDiffCheckStr3 = '<del>';
+            $content = $htmlDiff->build();
+            $colorizer = "@extends('layouts.app')
+            @section('assets')<style>
+            ins{background-color: Green;}
+            del{background-color: Red;}
+            </style>@endsection  @section('content')";
+            if(strpos($content, $hasDiffCheckStr3)|| strpos($content, $hasDiffCheckStr2)|| strpos($content, $hasDiffCheckStr1)){
+                $content = $colorizer.$content.'@endsection';
+                DB::table('links')->where('id','=',$id)->update(['link_diff' => $content, 'link_content' => $sourceCode]);
+                $this->linkChangedId[] = $id;
+            }
+            return 1;
+        }
+        else{
+            //handle not able to fetch files
+            return 0;
+        }        
+    }
+
+    public function changedLinks(){
+        $x = Auth::user()->links()->select('id','url','link_diff')->get();
+        $changedArr = array();
+        foreach($x as $p){
+            if($p->link_diff != null){
+                unset($p->link_diff);
+                $changedArr[] = $p;
+            }
+        }
+        return response()->json($changedArr);
+    }
+
+    public function showDiff($id){
+        if($x = Auth::user()->links()->get()->find($id)){
+            Storage::disk('view')->put('genFile.blade.php', $x->link_diff);
+            return view('genFile');
+        }
+        return view('addLinks',['diffFailMsg' => 'Error in fetching changes.']);
+    }
+
+    public function abc(){
+        // Storate::disk('local')->put('f1.blade.php','');
+        // return view('genFile');
     }
 };
 

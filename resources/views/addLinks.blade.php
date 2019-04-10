@@ -1,11 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>Add New Links</title>
+@extends('layouts.app')
+@section('assets')
     <link rel="stylesheet" href="https://bulma.io/css/bulma-docs.min.css?v=201904032112">
-</head>
-<body>
+@endsection
+@section('content')
     <div id="deleteResult"></div>
+    @if(isset($diffFailMsg))
+        <b>{{$diffFailMsg}}</b>
+    @endif
     @if(isset($success))
         @if($success == 0)
             <p id="saveLinkRes">Error in adding to DB</p>
@@ -20,6 +21,7 @@
     <section class="section ">
         <div class="container">
             <form id="addLinkForm" action="/saveLink" method="POST">
+                @csrf
                 <div class="field is-grouped column">
                     <div class="control is-expanded">
                         <input class="input" type="url" id='urlText' name='link' required placeholder="Enter a Link">
@@ -42,11 +44,23 @@
         </div>
     </section>
 
+    <section class="section">
+        <div class="container">
+            <button class="button is-primary" onclick="getChangedLinks()">Show Changed Links</button>
+        </div>
+        <div class="container" id="changedLinksId"></div>
+    </section>
+
     <script>
+        // prevent form from resubmitting
+        if ( window.history.replaceState ) {
+            window.history.replaceState( null, null, window.location.href );
+        }
         function showLinks(){
             if( document.getElementById('saveLinkRes') != null){
                 document.getElementById('saveLinkRes').innerHTML = "";
             }
+            document.getElementById('deleteResult').innerHTML = "";
             var table = '<table class="table">\
                 <thead><tr><th>S/n</th><th>Url</th><th>Added on</th><th>Delete</th>\
                 </thead><tbody>';
@@ -90,28 +104,27 @@
             xhttp.open('GET','/deleteLink/'+id);
             xhttp.send();
         }
-        // document.getElementById('addLinkForm').onsubmit= function(event){
-        //     event.preventDefault();
-        //     document.getElementById('linkErrorMsg').innerHTML = "Verifying Link...";
-        //     var link = document.getElementById('urlText').value;
-        //     var xhttp = new XMLHttpRequest();
-        //     xhttp.onreadystatechange = function(){
-        //         if(this.readyState == 4 && this.status == 200){
-        //             submitLink(link);
-        //         }
-        //         else if(this.status == 404){
-        //             document.getElementById('linkErrorMsg').innerHTML = "link not valid";
-        //         }
-        //     }
-        //     //to deal with No Access-Control-Allow-Origin header problem the heroku link is prepended.
-        //     xhttp.open('GET','https://cors-anywhere.herokuapp.com/'+link);
-        //     xhttp.send();
-        // }
-
-        // function submitLink(link){
-
-        // }
+        function getChangedLinks(){
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function(){
+                if(this.status == 200 && this.readyState == 4){
+                    var table = '<table class="table">\
+                    <thead><tr><th>S/n</th><th>Url</th>\
+                    </thead><tbody>';
+                    var x = JSON.parse(this.response);
+                    for(var i = 0; i < x.length; i++){
+                        table += '<tr>\
+                            <td>'+(i+1)+'</td>\
+                            <td><a href="showDiff/'+x[i].id+'">'+x[i].url+'</a></td>\
+                            </tr>';
+                    }
+                    table += '</tbody></table>';
+                    document.getElementById('changedLinksId').innerHTML = table;
+                }
+            }
+            xhttp.open('GET','/changedLinks');
+            xhttp.send();
+        }
 
     </script>
-</body>
-</html>
+@endsection
