@@ -25,7 +25,7 @@ class UrlRequestController extends Controller
         ]);
         $response = $client->request('GET');
         if($response->getStatusCode() == 200){
-            if(Link::select('*')->where(['url'=>$requestM->input('link')])->count() == 0){
+            if(Link::select('*')->where(['url'=>$requestM->input('link'), 'user_id' => Auth::user()->id])->count() == 0){
                 if(Auth::user()){
                     $sourceCode = $response->getBody()->read(99999999);
                     $sourceCode = preg_replace('/\s+/', ' ', $sourceCode);
@@ -63,7 +63,7 @@ class UrlRequestController extends Controller
 
     public function findDiff(){
         $this->linkChangedId = array();
-        $linksArr = Link::all();
+        $linksArr = Link::select('id','url')->get();
         foreach($linksArr as $link){
             $client = new Client([
                 'base_uri' => $link->url
@@ -72,12 +72,9 @@ class UrlRequestController extends Controller
             if($response->getStatusCode() == 200){
                 $sourceCode = $response->getBody()->read(99999999);
                 $sourceCode = preg_replace('/\s+/', ' ', $sourceCode);
-                if(Storage::disk('local')->put('file'.$link->id.'_new.html', $sourceCode)){
-                    Log::debug('callin diff for url:'.$link->url);
-                    $retVal = $this->generateDiff($link->id, $sourceCode);
-                    if($retVal == 0){
-                        continue;
-                    }
+                $retVal = $this->generateDiff($link->id, $sourceCode);
+                if($retVal == 0){
+                    continue;
                 }
                 else{
                     //handle not able to create new file 
@@ -89,18 +86,11 @@ class UrlRequestController extends Controller
                 continue;
             }
         }
-        $changedUrls = array();
-        Log::info(print_r($this->linkChangedId, true));
-        if(!empty($this->linkChangedId)){
-            foreach($this->linkChangedId as $id){
-                $changedUrls[] = $linksArr->find($id)->url;
-            }
-            Mail::to('rvkmr0851@gmail.com')->send(new LinksChanged($changedUrls));
-        }
+        $this->notifyUsers();
     }
 
     public function generateDiff($id, &$sourceCode){
-        $x = Link::find($id)->link_content;;
+        $x = Link::find($id)->link_content;
         if(!empty($x) && !empty($sourceCode)){
             $htmlDiff = new HtmlDiff($x, $sourceCode);
             $hasDiffCheckStr1 = 'class="diffmod"';
@@ -112,7 +102,7 @@ class UrlRequestController extends Controller
             ins{background-color: Green;}
             del{background-color: Red;}
             </style>@endsection  @section('content')";
-            if(strpos($content, $hasDiffCheckStr3)|| strpos($content, $hasDiffCheckStr2)|| strpos($content, $hasDiffCheckStr1)){
+            if(strpos($content, $hasDiffCheckStr3) !== false|| strpos($content, $hasDiffCheckStr2) !== false|| strpos($content, $hasDiffCheckStr1) !== false){
                 $content = $colorizer.$content.'@endsection';
                 DB::table('links')->where('id','=',$id)->update(['link_diff' => $content, 'link_content' => $sourceCode]);
                 $this->linkChangedId[] = $id;
@@ -145,9 +135,26 @@ class UrlRequestController extends Controller
         return view('addLinks',['diffFailMsg' => 'Error in fetching changes.']);
     }
 
-    public function abc(){
-        // Storate::disk('local')->put('f1.blade.php','');
-        // return view('genFile');
+    public function notifyUsers(){
+        $ulmap = array();
+        $users = [];
+        foreach($this->linkChangedId as $y){
+            $cc = Link::find($y)->user;
+            $users[] = $cc;
+            if(!isset($ulmap[$cc->id])){    
+                $ulmap[$cc->id] = array();
+            }
+            array_push($ulmap[$cc->id], $y);
+        }
+        $changedUrls = array();
+        $users = array_values(array_unique($users));
+        foreach($users as $x){
+            foreach($ulmap[$x->id] as $y){
+                $changedUrls[] = Link::find($y)->url;
+            }
+            Mail::to($x->email)->send(new LinksChanged($changedUrls));
+            $changedUrls = array();
+        }
     }
 };
 

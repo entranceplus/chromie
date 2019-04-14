@@ -6,5 +6,5 @@ The following Urls have changed: <br><br><br>
     <li><b>{{$link}}</b></li>
 @endforeach
 </ol><br><br>
-Regards,
-Ravi
+Regards,<br>
+Link-Diff Bot.
