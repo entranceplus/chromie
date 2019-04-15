@@ -99,8 +99,8 @@ class UrlRequestController extends Controller
             $content = $htmlDiff->build();
             $colorizer = "@extends('layouts.app')
             @section('assets')<style>
-            ins{background-color: Green;}
-            del{background-color: Red;}
+            ins{background-color: lightgreen;}
+            del{background-color: lightcoral;}
             </style>@endsection  @section('content')";
             if(strpos($content, $hasDiffCheckStr3) !== false|| strpos($content, $hasDiffCheckStr2) !== false|| strpos($content, $hasDiffCheckStr1) !== false){
                 $content = $colorizer.$content.'@endsection';
@@ -116,7 +116,7 @@ class UrlRequestController extends Controller
     }
 
     public function changedLinks(){
-        $x = Auth::user()->links()->select('id','url','link_diff')->get();
+        $x = Auth::user()->links()->select('id','url','link_diff')->orderby('updated_at', 'desc')->get();
         $changedArr = array();
         foreach($x as $p){
             if($p->link_diff != null){
@@ -128,9 +128,10 @@ class UrlRequestController extends Controller
     }
 
     public function showDiff($id){
-        if($x = Auth::user()->links()->get()->find($id)){
-            Storage::disk('view')->put('genFile.blade.php', $x->link_diff);
-            return view('genFile');
+        if(Link::find($id)->user->id == Auth::user()->id){
+            if(Storage::disk('view')->put('genFile.blade.php', Link::find($id)->link_diff)){
+                return view('genFile');
+            }
         }
         return view('addLinks',['diffFailMsg' => 'Error in fetching changes.']);
     }
