@@ -130,10 +130,7 @@ class UrlRequestController extends Controller
 
     public function showDiff($id){
         if(Link::find($id)->user->id == Auth::user()->id){
-            Artisan::call('view:clear');
-            if(Storage::disk('view')->put('genFile.blade.php', Link::find($id)->link_diff)){
-                return view('genFile');
-            }
+            return view('genFile',['content'=>Link::find($id)->link_diff]);
         }
         return view('addLinks',['diffFailMsg' => 'Error in fetching changes.']);
     }
