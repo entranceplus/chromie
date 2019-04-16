@@ -98,13 +98,7 @@ class UrlRequestController extends Controller
             $hasDiffCheckStr2 = '<ins>';
             $hasDiffCheckStr3 = '<del>';
             $content = $htmlDiff->build();
-            $colorizer = "@extends('layouts.app')
-            @section('assets')<style>
-            ins{background-color: lightgreen;}
-            del{background-color: lightcoral;}
-            </style>@endsection  @section('content')";
             if(strpos($content, $hasDiffCheckStr3) !== false|| strpos($content, $hasDiffCheckStr2) !== false|| strpos($content, $hasDiffCheckStr1) !== false){
-                $content = $colorizer.$content.'@endsection';
                 DB::table('links')->where('id','=',$id)->update(['link_diff' => $content, 'link_content' => $sourceCode]);
                 $this->linkChangedId[] = $id;
             }
