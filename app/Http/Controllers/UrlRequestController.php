@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 
 class UrlRequestController extends Controller
@@ -129,6 +130,7 @@ class UrlRequestController extends Controller
 
     public function showDiff($id){
         if(Link::find($id)->user->id == Auth::user()->id){
+            Artisan::call('view:clear');
             if(Storage::disk('view')->put('genFile.blade.php', Link::find($id)->link_diff)){
                 return view('genFile');
             }
