@@ -13,7 +13,6 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
-        'app\Console\Commands\DummyCmd',
         'app\Console\Commands\SiteChangedNotifier',
     ];
 
