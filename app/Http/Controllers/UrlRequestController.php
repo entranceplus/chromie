@@ -27,7 +27,7 @@ class UrlRequestController extends Controller
         $response = $client->request('GET');
         if($response->getStatusCode() == 200){
             if(Link::select('*')->where(['url'=>$requestM->input('link'), 'user_id' => Auth::user()->id])->count() == 0){
-                if(Auth::user()){
+                if(Auth::check()){
                     $sourceCode = $response->getBody()->read(99999999);
                     $sourceCode = preg_replace('/\s+/', ' ', $sourceCode);
                     $row = Link::create(['user_id'=>Auth::user()->id, 'url' => $requestM->input('link'), 'link_content' => $sourceCode]);
